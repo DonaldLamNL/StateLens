@@ -65,7 +65,8 @@ class FunctionTracer:
     def _get_line_text(self, lineno: int) -> str:
         idx = lineno - 1
         if 0 <= idx < len(self.code_lines):
-            return self.code_lines[idx]
+            # Remove indentation so Line records remain compact.
+            return self.code_lines[idx].lstrip()
         return ""
 
     @staticmethod
@@ -129,7 +130,7 @@ def build_conversation(code_text: str, function_call: str, trace: str, result: s
         f"Predict the exact output value for `{function_call}`, "
         "execute the program step by step before arriving at an answer within "
         "the tokens <think> and </think>, and output your prediction using the "
-        f"special tokens <answer> {function_call} == ?? [/answer]. "
+        f"special tokens <answer> {function_call} == ?? </answer>. "
         "Ensure the provided expression syntax is correct!\n"
     )
 
