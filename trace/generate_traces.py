@@ -146,10 +146,10 @@ def build_conversation(code_text: str, function_call: str, trace: str, result: s
     return {
         "system": "You are an expert Python programmer",
         "conversations": [
-            {"from": "user", "value": user_prompt},
+            {"from": "user", "value": user_prompt.strip()},
             {"from": "assistant", "value": assistant_reply},
         ],
-        "mask": "user",
+        # "mask": "user",
         "type": "VALUE_TO_TEXT",
     }
 
@@ -197,7 +197,7 @@ def parse_args(argv: Optional[List[str]] = None):
     )
     parser.add_argument(
         "--output",
-        default="training_traces.jsonl",
+        default="trace_train.jsonl",
         help="Destination JSONL file",
     )
     parser.add_argument(
