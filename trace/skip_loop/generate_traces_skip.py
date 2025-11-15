@@ -87,59 +87,120 @@ class FunctionTracer:
         formatted_lines: List[str] = []
 
         class LoopState:
-            def __init__(self, key, indent):
+            __slots__ = (
+                "key",
+                "indent",
+                "iterations",
+                "current",
+                "pending_header",
+            )
+
+            def __init__(self, key: Tuple[int, str], indent: int):
                 self.key = key
                 self.indent = indent
-                self.count = 0
-                self.skipping = False
-                self.ellipsis_added = False
+                self.iterations: List[List[str]] = []
+                self.current: List[str] = []
+                self.pending_header: Optional[str] = None
 
         loop_stack: List[LoopState] = []
 
-        def append_line(lineno: int, code_text: str, locals_dict: Dict[str, str]):
+        def render_line(lineno: int, code_text: str, locals_dict: Dict[str, str]) -> str:
             line_repr = f"Line {lineno}: `{code_text}`"
             if locals_dict:
                 locals_repr = ", ".join(
                     f"{k}={v}" for k, v in sorted(locals_dict.items())
                 )
                 line_repr = f"{line_repr}; {locals_repr}"
-            formatted_lines.append(line_repr)
+            return line_repr
+
+        def emit_lines(lines: List[str]):
+            if not lines:
+                return
+            if loop_stack:
+                loop_stack[-1].current.extend(lines)
+            else:
+                formatted_lines.extend(lines)
+
+        def close_loop(state: LoopState, top_level: bool) -> List[str]:
+            if state.current:
+                state.iterations.append(state.current)
+                state.current = []
+            state.pending_header = None
+            total = len(state.iterations)
+            if total == 0:
+                return []
+            flattened: List[str] = []
+
+            def append_iteration(iter_no: int, chunk: List[str]):
+                if top_level:
+                    flattened.append(f"=== Iteration {iter_no} ===")
+                flattened.extend(chunk)
+
+            def build_skip_line(skip_start: int, skip_end: int) -> str:
+                if skip_end == skip_start:
+                    core = f"Iterations {skip_start} skipped for `Line {state.key[0]}`"
+                else:
+                    core = f"Iterations {skip_start} to {skip_end} skipped for `Line {state.key[0]}`"
+                if top_level:
+                    return f"=== {core} ==="
+                return f"... ({core})"
+
+            if total <= 3:
+                for idx, chunk in enumerate(state.iterations, start=1):
+                    append_iteration(idx, chunk)
+                return flattened
+
+            append_iteration(1, state.iterations[0])
+            append_iteration(2, state.iterations[1])
+            skipped_end = total - 1
+            flattened.append(build_skip_line(3, skipped_end))
+            if top_level:
+                flattened.append("...")
+            append_iteration(total, state.iterations[-1])
+            return flattened
+
+        def flush_pending_headers(current_indent: int):
+            for state in loop_stack:
+                if (
+                    state.pending_header is not None
+                    and current_indent > state.indent
+                ):
+                    state.current.append(state.pending_header)
+                    state.pending_header = None
 
         for lineno, code_text, locals_dict, indent in self.records:
             key = (lineno, code_text)
+            rendered = render_line(lineno, code_text, locals_dict)
 
-            # Pop loops we have exited (indent decreased and different line).
+            flush_pending_headers(indent)
+
             while loop_stack and indent <= loop_stack[-1].indent and key != loop_stack[-1].key:
-                loop_stack.pop()
+                finished = loop_stack.pop()
+                emit_lines(close_loop(finished, top_level=len(loop_stack) == 0))
 
-            current_state = loop_stack[-1] if loop_stack and loop_stack[-1].key == key else None
             is_loop_header = code_text.startswith(("for ", "while "))
-            if is_loop_header and current_state is None:
-                current_state = LoopState(key, indent)
-                loop_stack.append(current_state)
-
-            if current_state is not None:
-                current_state.count += 1
-                if current_state.count > 3:
-                    if not current_state.ellipsis_added:
-                        formatted_lines.append(
-                            f"... (further iterations of `Line {lineno}` skipped)"
-                        )
-                        current_state.ellipsis_added = True
-                        current_state.skipping = True
-                    continue
-
-            # Skip any lines that are within a loop currently being skipped.
-            skip_due_to_parent = False
-            for state in loop_stack:
-                if state.skipping:
-                    if indent > state.indent or key == state.key:
-                        skip_due_to_parent = True
-                        break
-            if skip_due_to_parent:
+            if is_loop_header:
+                if loop_stack and loop_stack[-1].key == key:
+                    current_state = loop_stack[-1]
+                    if current_state.current:
+                        current_state.iterations.append(current_state.current)
+                    current_state.current = []
+                else:
+                    current_state = LoopState(key, indent)
+                    loop_stack.append(current_state)
+                current_state.pending_header = rendered
                 continue
 
-            append_line(lineno, code_text, locals_dict)
+            flush_pending_headers(indent)
+
+            if loop_stack:
+                loop_stack[-1].current.append(rendered)
+            else:
+                formatted_lines.append(rendered)
+
+        while loop_stack:
+            finished = loop_stack.pop()
+            emit_lines(close_loop(finished, top_level=len(loop_stack) == 0))
 
         return "\n".join(formatted_lines)
 
