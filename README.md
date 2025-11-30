@@ -1,6 +1,8 @@
 # StateLens
 Official repository for the paper "StateLens: Line-by-Line Execution State Supervision for Code LLMs"
 
+> **Course Project for CSCI5150: Machine Learning Algorithms and Applications**
+>
 > This repository is forked from [CodeCrash](https://github.com/cuhk-arise/CodeCrash) and extends it with execution trace generation and model training capabilities.
 
 ## 🛠️ Installation
@@ -27,8 +29,11 @@ This project consists of three main components:
 StateLens/
 ├── gpt_trace_generation/     # GPT-based trace generation
 ├── py_trace_generation/      # Python-based automatic trace generation
-└── training/                 # Model training and inference
+├── training/                 # Model training and inference
+└── results/                  # Experimental and evaluation results
 ```
+
+All experimental outputs, model predictions, and evaluation results are stored in the `./results` directory.
 
 ## 🔍 Trace Generation
 
