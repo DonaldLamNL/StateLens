@@ -7,7 +7,7 @@ Official repository for the paper "StateLens: Line-by-Line Execution State Super
 
 ## 🛠️ Installation
 ```bash
-git clone <repository-url>
+git clone https://github.com/DonaldLamNL/StateLens.git
 cd StateLens
 conda create -n statelens python=3.10
 conda activate statelens
