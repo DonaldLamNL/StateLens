@@ -1,0 +1,31 @@
+CUDA_VISIBLE_DEVICES=0 \
+python -m llamafactory.cli train \
+  --stage sft \
+  --model_name_or_path /data/pretrained_weights/Qwen2.5-7B-Instruct \
+  --do_train \
+  --dataset_dir /home/wcz/StateLens/LLaMA-Factory/data \
+  --dataset data_gpt_trace \
+  --template qwen \
+  --finetuning_type lora \
+  --lora_target q_proj,v_proj,k_proj,o_proj,up_proj,down_proj,gate_proj \
+  --lora_r 32 --lora_alpha 16 --lora_dropout 0.1 \
+  --output_dir /data/pretrained_weights/statelens/qwen2.5-7b-gpt-trace-sft \
+  --per_device_train_batch_size 1 \
+  --gradient_accumulation_steps 32 \
+  --num_train_epochs 6 \
+  --learning_rate 1e-4 \
+  --weight_decay 0.05 \
+  --warmup_ratio 0.1 \
+  --cutoff_len 4096 \
+  --gradient_checkpointing \
+  --packing True \
+  --bf16 \
+  --report_to none \
+  --save_strategy epoch \
+  --eval_strategy epoch \
+  --load_best_model_at_end \
+  --metric_for_best_model loss \
+  --val_size 0.1 \
+  --save_total_limit 3 \
+  --logging_steps 10 \
+  --log_level info

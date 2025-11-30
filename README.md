@@ -1,150 +1,185 @@
-# CodeCrash
-Official repository for the paper "CodeCrash: Exposing LLM Fragility to Misleading Natural Language in Code Reasoning"
+# StateLens
+Official repository for the paper "StateLens: Line-by-Line Execution State Supervision for Code LLMs"
 
-<p align="center">
-    <a href="https://cuhk-arise.github.io/CodeCrash/">🏠 Home Page</a> •
-    <a href="https://huggingface.co/datasets/CUHK-ARISE/CodeCrash">💻 Data </a> •
-    <a href="https://cuhk-arise.github.io/CodeCrash/leaderboard">🏆 Leaderboard</a>
-</p>
-
-<center>
-<img src="https://github.com/DonaldLamNL/codecrash_temp/blob/main/codecrash.svg?raw=true" alt="CodeCrash">
-</center>
-
-
-## 🧠 Introduction
-CodeCrash provides a unified stress-testing benchmark for evaluating the robustness of Large Language Models (LLMs) in code reasoning through code execution tasks. CodeCrash targets deeper comprehension by applying logic-preserving structural changes and misleading textual cues to real code. We systematically perturb two established benchmarks — CRUXEval and LiveCodeBench — with controlled distractions, and evaluate **17** LLMs across input prediction and code execution tasks. CodeCrash reveals key failure modes in modern LLMs and large reasoning models (LRMs), including overreliance on natural language cues in LLMs and reasoning collapse in QwQ-32B.
+> This repository is forked from [CodeCrash](https://github.com/cuhk-arise/CodeCrash) and extends it with execution trace generation and model training capabilities.
 
 ## 🛠️ Installation
 ```bash
-git clone https://cuhk-arise.github.io/CodeCrash/
-cd CodeCrash
-conda create -n codecrash python=3.10
-conda activate codecrash
+git clone <repository-url>
+cd StateLens
+conda create -n statelens python=3.10
+conda activate statelens
 pip install -r requirements.txt
 ```
 
-## 🎭 Perturbations
-In CodeCrash, we prepared three kinds of perturbations
-
-| Tag | Full Name | Type |
-|:------|:-------------|:-----------------|
-| `REN` | **Renaming Entities** | Structural |
-| `RTF` | **Reformatting Conditional Expressions** | Structural |
-| `GBC` | **Inserting Garbage Code Segments** | Structural |
-| `PSC_ALL` | **Aggregated Structural Perturbation** | Structural |
-| `MCC` | **Misleading Code Comments** | Contextual-Level |
-| `MPS` | **Misleading Print Statements** | Contextual-Level |
-| `MHC` | **Misleading Hint Comments** | Reasoning-Level |
-
-> [!Tip]
->
-> See the [🎭 Perturbations Introduction](ADVANCED_USAGE.md#-perturbations-introduction) section for example usage for each perturbation.
-
-
-
-### 🚀 Quick Start — Perturb a Dataset
+For training functionality, also install LLaMA-Factory:
 ```bash
-# Apply a perturbation to a pre-defined dataset
-python perturb.py \
-    --dataset [crux|lcb] \
-    --perturbation [REN|RTF|GBC|PSC_ALL|MCC|MPS] \
-    --output-name "<output_name>"
-
-# Apply MHC perturbation using GPT-4o to a customized dataset
-python perturb.py \
-    --dataset-path ".../crux.jsonl" \
-    --perturbation MHC \
-    --model "<model_name>" \
-    --platform [openai|anthropic|gemini|azure|deepinfra|deepseek|qwen|sglang] \
-    --task [input|output] \
-    --output-name "<output_name>" \
-    --max-workers 5
+git clone https://github.com/hiyouga/LLaMA-Factory.git
+cd LLaMA-Factory
+pip install -e .
 ```
 
-> [!Tip]
->
-> See the [🚀 Perturb a Dataset](ADVANCED_USAGE.md#-perturb-a-dataset) section for more details.
+## 📂 Project Structure
 
-- All perturbed datasets are saved in the `customize_datasets` directory.
+This project consists of three main components:
 
-- 📁 Folder Structure:
-    ```
-    customize_datasets/
-    └── {output_name}.jsonl/
-    ```
-
-
-### 🧪 Quick Start — Generate and Evaluate
-```bash
-# Run perturbation experiments wth evaluation
-python process.py \
-    --dataset [crux|lcb] \
-    --perturbation [VAN|REN|RTF|GBC|PSC_ALL|MCC|MPS|MHC] \
-    --model "<model_name>" \
-    --platform [openai|anthropic|gemini|azure|deepinfra|deepseek|qwen|sglang] \
-    --task [input|output] \
-    --infer-mode [direct|cot] \
-    --num-samples 2 \
-    --max-workers 10 \
-    --load-existing \
-    --evaluate
-
-#  Evaluate a saved output file independently
-python eval.py \
-    --filepath "<filepath>" \
-    --task [input|output] \
-    --max_workers 10
+```
+StateLens/
+├── gpt_trace_generation/     # GPT-based trace generation
+├── py_trace_generation/      # Python-based automatic trace generation
+└── training/                 # Model training and inference
 ```
 
-> [!Tip]
->
-> See the [🧪 Generate Outputs](ADVANCED_USAGE.md#-generate-outputs) section for more details.
->
-> See the [📊 Evaluate a File](ADVANCED_USAGE.md#-evaluate-a-file) section for more details.
+## 🔍 Trace Generation
 
-- All results are saved in the `results` directory.
+### 1. GPT-Based Trace Generation (`gpt_trace_generation/`)
 
-- Generated outputs are stored as `{dataset}_{task}_{perturbation}_{infer_mode}.jsonl` unless `--output-name` is specified.
+Generate execution traces using GPT models for variable tracking.
 
-- Evaluation results are saved as `{dataset}_{task}_{perturbation}_{infer_mode}_eval.json` or `{output_name}_eval.json`.
+#### Generate Traces with GPT
+```bash
+cd gpt_trace_generation
+python trace_generation.py
+```
 
-- 📁 Folder Structure:
-    ```
-    results/
-    └── {model_folder_name}/
-        └── {output_name}.jsonl
-        └── {output_name}_eval.json
-    ```
+This script:
+- Uses GPT-5 to generate line-by-line variable state traces
+- Extracts local variables and tracks their values through execution
+- Validates outputs against expected results
+- Saves traces to `gpt5-variable-tracking.jsonl`
 
-## 🔑 API Access & Configuration
-All experiments were conducted through API access (including [OpenAI](https://platform.openai.com/docs/overview), [Anthropic](https://console.anthropic.com/login?returnTo=%2F%3F), [Gemini](https://aistudio.google.com), [AzureChat](https://azure.microsoft.com/en-us/get-started/azure-portal), [DeepInfra](https://deepinfra.com), [DeepSeek](https://platform.deepseek.com), and [Qwen](https://qwen.ai/home)), as well as via SGLang, which allows you to deploy and host your locally trained or Hugging Face LLMs.
+#### Convert to Training Format
+```bash
+python construct_data.py
+```
 
-To use these APIs, you must create an account and configure your API keys in an `.env` file.
+Converts GPT-generated traces into training data format:
+- Parses markdown tables from GPT responses
+- Formats as conversational training examples
+- Outputs to `data_gpt_trace.jsonl`
+
+**Output Files:**
+- `gpt5-variable-tracking.jsonl`: Raw GPT-generated traces
+- `data_gpt_trace.jsonl`: Formatted training data
+
+### 2. Python-Based Trace Generation (`py_trace_generation/`)
+
+Automatically generate execution traces using Python's `sys.settrace` mechanism.
+
+#### Basic Trace Generation
+```bash
+cd py_trace_generation
+python generate_traces.py \
+    --input cruxeval.jsonl \
+    --output data_py_trace.jsonl \
+    --limit 1000  # optional
+```
+
+This generates full execution traces with all loop iterations.
+
+#### Loop-Optimized Trace Generation
+```bash
+python generate_traces_skip.py \
+    --input cruxeval.jsonl \
+    --output data_py_trace_skip.jsonl \
+    --limit 1000  # optional
+```
+
+For loops with many iterations, this version:
+- Shows iterations 1 and 2 in full
+- Skips intermediate iterations
+- Shows the final iteration
+- Significantly reduces trace length for training efficiency
+
+**Features:**
+- Automatic execution tracing without LLM API calls
+- Line-by-line variable state tracking
+- Support for nested loops and complex control flow
+- Handles special cases (e.g., rot13 encoding)
+
+**Output Format:**
+Both scripts produce JSONL files with:
+- User prompt with code and function call
+- Assistant response with `<think>` (execution trace) and `<answer>` (output) tags
+- Training-ready conversation format
+
+## 🚀 Model Training (`training/`)
+
+Train models using generated execution traces.
+
+### Fine-tuning with LLaMA-Factory
+
+Edit `train.sh` to configure paths and hyperparameters:
+
+```bash
+#!/bin/bash
+CUDA_VISIBLE_DEVICES=0 \
+python -m llamafactory.cli train \
+  --stage sft \
+  --model_name_or_path <path-to-base-model> \
+  --dataset_dir <path-to-data-directory> \
+  --dataset data_gpt_trace \  # or data_py_trace_skip
+  --template qwen \
+  --finetuning_type lora \
+  --lora_target q_proj,v_proj,k_proj,o_proj,up_proj,down_proj,gate_proj \
+  --lora_r 32 --lora_alpha 16 --lora_dropout 0.1 \
+  --output_dir <path-to-output> \
+  --per_device_train_batch_size 1 \
+  --gradient_accumulation_steps 32 \
+  --num_train_epochs 6 \
+  --learning_rate 1e-4 \
+  --cutoff_len 4096 \
+  --bf16 \
+  --val_size 0.1
+```
+
+Run training:
+```bash
+cd training
+bash train.sh
+```
+
+### Inference
+
+Run inference on trained models:
+
+```bash
+python inference.py \
+  --dataset-path <path-to-test-data> \
+  --model-path <path-to-trained-model> \
+  --output-path predictions.jsonl \
+  --device cuda:0
+```
+
+**Parameters:**
+- `--dataset-path`: Input test dataset (JSONL format)
+- `--model-path`: Path to trained model checkpoint
+- `--output-path`: Where to save predictions
+- `--device`: Device to run inference on (cuda:0, cpu, etc.)
+
+## 🔑 API Configuration
+
+For GPT-based trace generation, configure API keys in `.env`:
+
 ```bash
 OPENAI_API_KEY="<your_openai_api_key>"
-ANTHROPIC_API_KEY="<your_anthropic_api_key>"
-GEMINI_API_KEY="<your_gemini_api_key>"
-
-AZURE_OPENAI_API_KEY="<your_azure_openai_api_key>"
-AZURE_ENDPOINT="<your_azure_endpoint>"
-AZURE_VERSION="<your_azure_version>"
-
-DEEPINFRA_API_KEY="<your_deepinfra_api_key>"
-DEEPSEEK_API_KEY="<your_deepseek_api_key>"
-QWEN_API_KEY="<your_qwen_api_key>"
 ```
 
-## 📜 Citation
+## 📊 Workflow
 
-```bibtex
-@article{lam2025codecrash,
-    author={Man Ho Lam and Chaozheng Wang and Jen{-}tse Huang and Michael R. Lyu},
-    title={CodeCrash: Stress Testing LLM Reasoning under Structural and Semantic Perturbations},
-    journal={arXiv preprint arXiv:2504.14119},
-    year={2025}
-}
-```
+1. **Generate Training Data**
+   - Option A: Use `gpt_trace_generation/` for LLM-generated traces
+   - Option B: Use `py_trace_generation/` for automatic Python traces
+
+2. **Train Model**
+   - Configure `training/train.sh` with your paths
+   - Run training with LLaMA-Factory
+
+3. **Evaluate**
+   - Use `training/inference.py` to generate predictions
+   - Evaluate using the CodeCrash evaluation framework
 
 ## 🙏 Acknowledgement
-- [Code TREAT](https://code-treat.vercel.app/#home)
+- [CodeCrash](https://github.com/cuhk-arise/CodeCrash) - Base framework for code perturbations
+- [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory) - Efficient model training framework
+- [CruxEval](https://github.com/facebookresearch/cruxeval) - Code execution reasoning benchmark
